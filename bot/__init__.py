@@ -11,7 +11,7 @@ class AlertBot:
     def __init__(self):
         self.__client_id = os.environ.get("TWITCH_ID")
         self.__client_secret = os.environ.get("TWITCH_SECRET")
-        self.__discord_hook = os.environ.get("TEST_HOOK")
+        self.__discord_hook = os.environ.get("DISCORD_WEBHOOK")
 
         self.__token = self.__get_token()
         self.__twitch = {}
