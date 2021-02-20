@@ -1,6 +1,7 @@
+"""Main entry point for the AlertBot"""
+
 from bot import AlertBot
 
 if __name__ == "__main__":
-    a = AlertBot()
-    a.get_channel()
-    a.send_alert()
+    bot = AlertBot()
+    bot.send_alert(bot.get_channel())
