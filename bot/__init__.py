@@ -1,15 +1,18 @@
 """This module houses bot classes"""
+import re
 import os
+import sys
+import socket
 import requests
 from config import get_env, stream_logger
 from utils import time_conversion, alert_msg
 
 logger = stream_logger()
+get_env()
 
 
-class AlertBot:
+class DiscordAlertBot:
     """This class sends an alert to discord with Twitch stream information"""
-    get_env()
 
     twitch_auth = os.getenv("AUTH_URL")
     twitch_channel = os.getenv("CHANNEL_DETAILS") + f'"{os.getenv("USERNAME")}"'
@@ -61,13 +64,15 @@ class AlertBot:
         logger.info("GAME: %i", game_request.status_code)
 
         game_details = game_request.json()['data'][0]
+        game_img = game_details.get("box_art_url").replace("{width}x{height}", "130x170")
+        game_img = game_img.replace("/./", "/")
 
         twitch = {'live': channel_details.get("is_live"),
                   'name': channel_details.get('display_name'),
                   'title': channel_details.get('title'),
                   'begin': time_conversion(channel_details.get('started_at')),
                   'game': game_details.get('name'),
-                  'img': game_details.get("box_art_url").replace("{width}x{height}", "130x170")}
+                  'img': game_img}
 
         return twitch
 
@@ -81,3 +86,58 @@ class AlertBot:
         post.raise_for_status()
 
         logger.info("DISCORD: %i", post.status_code)
+
+
+class TwitchChatBot:
+    def __init__(self, channel, nickname):
+        self.channel = channel
+        self.nickname = nickname
+
+        self.server = 'irc.chat.twitch.tv'
+        self.port = 6667
+        self.__token = os.getenv("TWITCH_CHAT_TOKEN")
+
+        self.sock = socket.socket()
+        self.sock.connect((self.server, self.port))
+
+        self.sock.send(f"PASS {self.__token}\r\n".encode("utf-8"))
+        self.sock.send(f"NICK {self.nickname}\r\n".encode("utf-8"))
+        self.sock.send(f"JOIN #{self.channel}\r\n".encode("utf-8"))
+
+        self.prefix = f"PRIVMSG #{self.channel} :"
+
+    def send_pong(self, msg: str) -> int:
+        if msg.startswith("PING"):
+            self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
+            print("PONG SENT")
+
+            return 0
+
+    def ouija_command(self, msg: str, sender: str) -> int:
+        if "!ouija" in msg:
+            ouija_phrase = msg.split("!ouija")[1].strip()
+            self.sock.send(f"{self.prefix}{sender} submitted phrase: {ouija_phrase}\r\n".encode('utf-8'))
+            print(f"Ouija Command Received: Sender: {sender}, Phrase: {ouija_phrase}")
+
+            return 0
+
+    def run(self):
+
+        while True:
+            try:
+                msg = self.sock.recv(2048).decode("utf-8")
+                print(msg)
+                self.send_pong(msg=msg)
+
+                full_message = re.search('[:](.*)[!].*@.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)', msg)
+
+                if full_message:
+                    # channel = full_message.group(2)
+                    username = full_message.group(1)
+                    message = full_message.group(3)
+
+                    self.ouija_command(msg=message, sender=username)
+
+            except KeyboardInterrupt:
+                self.sock.close()
+                sys.exit(0)
