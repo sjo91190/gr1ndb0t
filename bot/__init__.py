@@ -4,10 +4,9 @@ import os
 import sys
 import socket
 import requests
-from config import get_env, stream_logger
+from config import get_env, CreateLogger
 from utils import time_conversion, alert_msg
 
-logger = stream_logger()
 get_env()
 
 
@@ -19,6 +18,7 @@ class DiscordAlertBot:
     twitch_game = os.getenv("GAME")
 
     def __init__(self):
+        self.logger = CreateLogger().console_stream()
 
         self.__client_id = os.getenv("TWITCH_ID")
         self.__client_secret = os.getenv("TWITCH_SECRET")
@@ -37,7 +37,7 @@ class DiscordAlertBot:
         auth_request = requests.post(url=self.twitch_auth, json=auth_payload)
         auth_request.raise_for_status()
 
-        logger.info("AUTH: %i", auth_request.status_code)
+        self.logger.info("AUTH: %i", auth_request.status_code)
 
         return auth_request.json()['access_token']
 
@@ -53,7 +53,7 @@ class DiscordAlertBot:
         channel_request = requests.get(url=self.twitch_channel, headers=get_headers)
         channel_request.raise_for_status()
 
-        logger.info("CHANNEL: %i", channel_request.status_code)
+        self.logger.info("CHANNEL: %i", channel_request.status_code)
 
         channel_details = channel_request.json()['data'][0]
 
@@ -61,7 +61,7 @@ class DiscordAlertBot:
         game_request = requests.get(url=game_url, headers=get_headers)
         game_request.raise_for_status()
 
-        logger.info("GAME: %i", game_request.status_code)
+        self.logger.info("GAME: %i", game_request.status_code)
 
         game_details = game_request.json()['data'][0]
         game_img = game_details.get("box_art_url").replace("{width}x{height}", "130x170")
@@ -85,11 +85,12 @@ class DiscordAlertBot:
         post = requests.post(url=self.__discord_hook, json=alert_msg(data=twitch_data))
         post.raise_for_status()
 
-        logger.info("DISCORD: %i", post.status_code)
+        self.logger.info("DISCORD: %i", post.status_code)
 
 
 class TwitchChatBot:
     def __init__(self, channel, nickname):
+        self.logger = CreateLogger().file_console_stream()
         self.channel = channel
         self.nickname = nickname
 
@@ -103,38 +104,61 @@ class TwitchChatBot:
         self.sock.send(f"PASS {self.__token}\r\n".encode("utf-8"))
         self.sock.send(f"NICK {self.nickname}\r\n".encode("utf-8"))
         self.sock.send(f"JOIN #{self.channel}\r\n".encode("utf-8"))
+        self.sock.send("CAP REQ :twitch.tv/membership\r\n".encode("utf-8"))
+        self.sock.send("CAP REQ :twitch.tv/tags\r\n".encode("utf-8"))
+        self.sock.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
 
         self.prefix = f"PRIVMSG #{self.channel} :"
 
     def send_pong(self, msg: str) -> int:
         if msg.startswith("PING"):
             self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
-            print("PONG SENT")
+            self.logger.info("SERVER MSG - PONG SENT")
 
             return 0
+
+    def del_message(self, msg: str, sender: str, msg_id: str):
+        if "!delete" in msg:
+            self.sock.send(f"{self.prefix}/delete {msg_id}\r\n".encode("utf-8"))
+            self.sock.send(f"{self.prefix}{sender}: MESSAGE DELETED\r\n".encode("utf-8"))
 
     def ouija_command(self, msg: str, sender: str) -> int:
         if "!ouija" in msg:
             ouija_phrase = msg.split("!ouija")[1].strip()
+            self.logger.info(f"COMMAND RECEIVED - !ouija - Sender: {sender}, Phrase: {ouija_phrase}")
             self.sock.send(f"{self.prefix}{sender} submitted phrase: {ouija_phrase}\r\n".encode('utf-8'))
-            print(f"Ouija Command Received: Sender: {sender}, Phrase: {ouija_phrase}")
 
             return 0
 
     def run(self):
-
         while True:
             try:
                 msg = self.sock.recv(2048).decode("utf-8")
-                print(msg)
+                self.logger.info(msg.strip())
                 self.send_pong(msg=msg)
 
-                full_message = re.search('[:](.*)[!].*@.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)', msg)
+                if "JOIN" in msg:
+                    joiner = re.search(":(.*?)!", msg)
+                    if joiner:
+                        joiner = joiner.group(1)
+                        self.logger.info(f"CHANNEL JOIN - {joiner}")
+
+                if "PART" in msg:
+                    parter = re.search(":(.*?)!", msg)
+                    if parter:
+                        parter = parter.group(1)
+                        self.logger.info(f"CHANNEL PART - {parter}")
+
+                full_message = re.search("badge-info=;badges=(.*?)/.*;id=(.*?);.*:(.*?)!.*@.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
 
                 if full_message:
-                    # channel = full_message.group(2)
-                    username = full_message.group(1)
-                    message = full_message.group(3)
+                    badge = full_message.group(1)
+                    msg_id = full_message.group(2)
+                    username = full_message.group(3)
+                    channel = full_message.group(4)
+                    message = full_message.group(5).strip()
+
+                    self.logger.info(f"USER MSG - Username: {username}, Message: {message}")
 
                     self.ouija_command(msg=message, sender=username)
 
