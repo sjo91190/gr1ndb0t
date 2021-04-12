@@ -8,6 +8,7 @@ from config import get_env, CreateLogger
 from utils import time_conversion, alert_msg
 
 get_env()
+SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "NOTICE", "RECONNECT", "ROOMSTATE", "USERNOTICE", "USERSTATE"]
 
 
 class DiscordAlertBot:
@@ -110,57 +111,85 @@ class TwitchChatBot:
 
         self.prefix = f"PRIVMSG #{self.channel} :"
 
-    def send_pong(self, msg: str) -> int:
-        if msg.startswith("PING"):
-            self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
-            self.logger.info("SERVER MSG - PONG SENT")
+    def send_pong(self) -> bool:
+        self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
+        self.logger.info("SERVER MSG - PONG SENT")
 
-            return 0
+        return True
 
-    def del_message(self, msg: str, sender: str, msg_id: str):
-        if "!delete" in msg:
-            self.sock.send(f"{self.prefix}/delete {msg_id}\r\n".encode("utf-8"))
-            self.sock.send(f"{self.prefix}{sender}: MESSAGE DELETED\r\n".encode("utf-8"))
+    def clear_chat(self, sender: str) -> bool:
+        self.logger.info(f"COMMAND RECEIVED - !clear - Sender: {sender}")
+        self.sock.send(f"{self.prefix}/clear\r\n".encode("utf-8"))
 
-    def ouija_command(self, msg: str, sender: str) -> int:
-        if "!ouija" in msg:
+        return True
+
+    def del_message(self, msg: str, sender: str, msg_id: str) -> bool:
+        self.sock.send(f"{self.prefix}/delete {msg_id}\r\n".encode("utf-8"))
+        self.sock.send(f"{self.prefix}{sender}: MESSAGE DELETED: {msg}\r\n".encode("utf-8"))
+
+        return True
+
+    def ouija_command(self, msg: str, sender: str) -> bool:
+        if msg.startswith("!ouija"):
             ouija_phrase = msg.split("!ouija")[1].strip()
             self.logger.info(f"COMMAND RECEIVED - !ouija - Sender: {sender}, Phrase: {ouija_phrase}")
             self.sock.send(f"{self.prefix}{sender} submitted phrase: {ouija_phrase}\r\n".encode('utf-8'))
 
-            return 0
+            return True
+
+    def lurker(self, msg: str, sender: str) -> bool:
+        if msg.startswith("!lurk"):
+            self.logger.info(f"COMMAND RECEIVED - !lurk - Sender: {sender}")
+            self.sock.send(f"{self.prefix}Yo, {sender}! {self.channel} wanted me to tell you he thinks you're awesome and thanks for the lurk! Hope you can make it back!!!\r\n".encode("utf-8"))
+            return True
+
+    def switch_code(self, msg: str, sender: str) -> bool:
+        if msg.startswith("!fc"):
+            self.logger.info(f"COMMAND RECEIVED - !fc - Sender: {sender}")
+            self.sock.send(f"{self.prefix}{self.channel} told me to tell you his Switch Friend Code is: 8562-2808-8201\r\n".encode('utf-8'))
+            return True
 
     def run(self):
         while True:
             try:
                 msg = self.sock.recv(2048).decode("utf-8")
-                self.logger.info(msg.strip())
-                self.send_pong(msg=msg)
 
-                if "JOIN" in msg:
+                full_message = re.search(".*;display-name=(.*?);.*;id=(.*?);.*mod=(.*?);.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
+
+                if any(cmd in msg for cmd in SERVER_CMDS):
+                    self.logger.info(f"SERVER COMMAND - {msg.strip()}")
+
+                elif msg.startswith("PING"):
+                    self.logger.info(f"SERVER MSG - {msg.strip()}")
+                    self.send_pong()
+
+                elif "JOIN" in msg:
                     joiner = re.search(":(.*?)!", msg)
                     if joiner:
                         joiner = joiner.group(1)
                         self.logger.info(f"CHANNEL JOIN - {joiner}")
 
-                if "PART" in msg:
+                elif "PART" in msg:
                     parter = re.search(":(.*?)!", msg)
                     if parter:
                         parter = parter.group(1)
                         self.logger.info(f"CHANNEL PART - {parter}")
 
-                full_message = re.search("badge-info=;badges=(.*?)/.*;id=(.*?);.*:(.*?)!.*@.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
-
-                if full_message:
-                    badge = full_message.group(1)
-                    msg_id = full_message.group(2)
-                    username = full_message.group(3)
-                    channel = full_message.group(4)
+                elif full_message:
+                    username = full_message.group(1).strip()
+                    msg_id = full_message.group(2).strip()
+                    mod_status = full_message.group(3).strip()
+                    channel = full_message.group(4).strip()
                     message = full_message.group(5).strip()
 
-                    self.logger.info(f"USER MSG - Username: {username}, Message: {message}")
+                    self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
 
                     self.ouija_command(msg=message, sender=username)
+                    self.lurker(msg=message, sender=username)
+                    self.switch_code(msg=message, sender=username)
+
+                else:
+                    self.logger.info(f"UNCATEGORIZED - {msg.strip()}")
 
             except KeyboardInterrupt:
                 self.sock.close()
