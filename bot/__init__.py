@@ -5,7 +5,9 @@ import sys
 import socket
 import requests
 from config import get_env, CreateLogger
-from utils import time_conversion, alert_msg
+from utils import time_conversion, alert_msg, initiate_connection
+from bot.commands import AllCommands
+
 
 get_env()
 SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "NOTICE", "RECONNECT", "ROOMSTATE", "USERNOTICE", "USERSTATE"]
@@ -93,23 +95,18 @@ class TwitchChatBot:
     def __init__(self, channel, nickname):
         self.logger = CreateLogger().file_console_stream()
         self.channel = channel
-        self.nickname = nickname
+        self.greeted = False
 
-        self.server = 'irc.chat.twitch.tv'
-        self.port = 6667
+        self.server = os.getenv("IRC_SERVER")
+        self.port = int(os.getenv("IRC_PORT"))
         self.__token = os.getenv("TWITCH_CHAT_TOKEN")
 
         self.sock = socket.socket()
         self.sock.connect((self.server, self.port))
 
-        self.sock.send(f"PASS {self.__token}\r\n".encode("utf-8"))
-        self.sock.send(f"NICK {self.nickname}\r\n".encode("utf-8"))
-        self.sock.send(f"JOIN #{self.channel}\r\n".encode("utf-8"))
-        self.sock.send("CAP REQ :twitch.tv/membership\r\n".encode("utf-8"))
-        self.sock.send("CAP REQ :twitch.tv/tags\r\n".encode("utf-8"))
-        self.sock.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
+        initiate_connection(sock=self.sock, token=self.__token, nickname=nickname, channel=self.channel)
 
-        self.prefix = f"PRIVMSG #{self.channel} :"
+        self.cmds = AllCommands(logger=self.logger, sock=self.sock, channel=self.channel)
 
     def send_pong(self) -> bool:
         self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
@@ -117,44 +114,16 @@ class TwitchChatBot:
 
         return True
 
-    def clear_chat(self, sender: str) -> bool:
-        self.logger.info(f"COMMAND RECEIVED - !clear - Sender: {sender}")
-        self.sock.send(f"{self.prefix}/clear\r\n".encode("utf-8"))
-
-        return True
-
-    def del_message(self, msg: str, sender: str, msg_id: str) -> bool:
-        self.sock.send(f"{self.prefix}/delete {msg_id}\r\n".encode("utf-8"))
-        self.sock.send(f"{self.prefix}{sender}: MESSAGE DELETED: {msg}\r\n".encode("utf-8"))
-
-        return True
-
-    def ouija_command(self, msg: str, sender: str) -> bool:
-        if msg.startswith("!ouija"):
-            ouija_phrase = msg.split("!ouija")[1].strip()
-            self.logger.info(f"COMMAND RECEIVED - !ouija - Sender: {sender}, Phrase: {ouija_phrase}")
-            self.sock.send(f"{self.prefix}{sender} submitted phrase: {ouija_phrase}\r\n".encode('utf-8'))
-
-            return True
-
-    def lurker(self, msg: str, sender: str) -> bool:
-        if msg.startswith("!lurk"):
-            self.logger.info(f"COMMAND RECEIVED - !lurk - Sender: {sender}")
-            self.sock.send(f"{self.prefix}Yo, {sender}! {self.channel} wanted me to tell you he thinks you're awesome and thanks for the lurk! Hope you can make it back!!!\r\n".encode("utf-8"))
-            return True
-
-    def switch_code(self, msg: str, sender: str) -> bool:
-        if msg.startswith("!fc"):
-            self.logger.info(f"COMMAND RECEIVED - !fc - Sender: {sender}")
-            self.sock.send(f"{self.prefix}{self.channel} told me to tell you his Switch Friend Code is: 8562-2808-8201\r\n".encode('utf-8'))
-            return True
-
     def run(self):
         while True:
             try:
                 msg = self.sock.recv(2048).decode("utf-8")
 
                 full_message = re.search(".*;display-name=(.*?);.*;id=(.*?);.*mod=(.*?);.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
+                reward_id = re.search(";custom-reward-id=(.*?);", msg)
+
+                if reward_id:
+                    reward_id = reward_id.group(1)
 
                 if any(cmd in msg for cmd in SERVER_CMDS):
                     self.logger.info(f"SERVER COMMAND - {msg.strip()}")
@@ -184,9 +153,15 @@ class TwitchChatBot:
 
                     self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
 
-                    self.ouija_command(msg=message, sender=username)
-                    self.lurker(msg=message, sender=username)
-                    self.switch_code(msg=message, sender=username)
+                    if not self.greeted:
+                        self.cmds.greet(target="ultimatesebs", username=username)
+                        self.greeted = True
+
+                    self.cmds.channel_points_reward(msg=message, sender=username, reward_uuid=reward_id)
+
+                    self.cmds.lurker(msg=message, sender=username)
+                    self.cmds.switch_code(msg=message, sender=username)
+                    self.cmds.updog(msg=message, sender=username)
 
                 else:
                     self.logger.info(f"UNCATEGORIZED - {msg.strip()}")

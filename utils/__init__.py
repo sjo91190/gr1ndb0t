@@ -1,5 +1,17 @@
 """This module contains various utility functions"""
+from socket import socket
 from datetime import datetime
+
+
+def initiate_connection(sock: socket, token: str, nickname: str, channel: str) -> bool:
+    sock.send(f"PASS {token}\r\n".encode("utf-8"))
+    sock.send(f"NICK {nickname}\r\n".encode("utf-8"))
+    sock.send(f"JOIN #{channel}\r\n".encode("utf-8"))
+    sock.send("CAP REQ :twitch.tv/membership\r\n".encode("utf-8"))
+    sock.send("CAP REQ :twitch.tv/tags\r\n".encode("utf-8"))
+    sock.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
+
+    return True
 
 
 def time_conversion(iso_timestamp: str) -> str:
