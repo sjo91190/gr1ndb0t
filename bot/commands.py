@@ -52,13 +52,29 @@ class BotCommands:
 
 class ChannelRewards(BotCommands):
 
-    def channel_points_reward(self, msg: str, sender: str, reward_uuid) -> bool:
-        if reward_uuid == os.getenv("OUIJA_PHRASE"):
-            self.logger.info(f"REDEMPTION RECEIVED - Ouija Phrase - Sender: {sender} - Phrase: {msg}")
-            self.sock.send(f"{self.prefix}{self.channel} Phrase submission received! -- {msg}\r\n".encode("utf-8"))
+    def get_reward(self, reward_uuid: str):
+        # print(f"REWARD ID: {reward_uuid}")
+        reward_dict = {
+            os.getenv("OUIJA_PHRASE"): self.ouija_phrase,
+            os.getenv("ANOTHER_REWARD"): self.another_reward
+        }
 
-            return True
+        if reward_dict.get(reward_uuid) is not None:
+            return reward_dict.get(reward_uuid)
 
+        return None
+
+    def ouija_phrase(self, msg: str, sender: str) -> bool:
+        self.logger.info(f"REDEMPTION RECEIVED - Ouija Phrase - Sender: {sender} - Phrase: {msg}")
+        self.sock.send(f"{self.prefix}{self.channel} Phrase submission received! -- {msg}\r\n".encode("utf-8"))
+
+        return True
+
+    def another_reward(self, msg: str, sender: str) -> bool:
+        self.logger.info(f"REDEMPTION RECEIVED - Another Reward - Sender: {sender} - Phrase: {msg}")
+        self.sock.send(f"{self.prefix}{self.channel} Another Reward submission received! -- {msg}\r\n".encode("utf-8"))
+
+        return True
 
 class AllCommands(ChannelRewards):
     pass

@@ -154,10 +154,12 @@ class TwitchChatBot:
                     self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
 
                     if not self.greeted:
-                        self.cmds.greet(target="ultimatesebs", username=username)
+                        self.cmds.greet(target="ultimatesebs", username=username.lower())
                         self.greeted = True
 
-                    self.cmds.channel_points_reward(msg=message, sender=username, reward_uuid=reward_id)
+                    channel_point_reward = self.cmds.get_reward(reward_uuid=reward_id)
+                    if channel_point_reward:
+                        channel_point_reward(msg=message, sender=username)
 
                     self.cmds.lurker(msg=message, sender=username)
                     self.cmds.switch_code(msg=message, sender=username)
