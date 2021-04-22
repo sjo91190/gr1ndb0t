@@ -76,5 +76,6 @@ class ChannelRewards(BotCommands):
 
         return True
 
+
 class AllCommands(ChannelRewards):
     pass
