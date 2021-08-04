@@ -45,6 +45,7 @@ class BotCommands:
     def greet(self, target: str, username: str) -> bool:
         if username == target:
             self.logger.info(f"GREETING SENT - {username}")
+            self.logger.info("\n\n******************\nGREETING SENT\n*****************\n\n")
             self.sock.send(f"{self.prefix}sup, {username}\r\n".encode('utf-8'))
 
             return True
