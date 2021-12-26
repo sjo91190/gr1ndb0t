@@ -17,7 +17,8 @@ class DiscordAlertBot:
     """This class sends an alert to discord with Twitch stream information"""
 
     twitch_auth = os.getenv("AUTH_URL")
-    twitch_channel = os.getenv("CHANNEL_DETAILS") + f'"{os.getenv("USERNAME")}"'
+    twitch_channel = f"https://api.twitch.tv/helix/channels?broadcaster_id={os.getenv('USER_ID')}"
+
     twitch_game = os.getenv("GAME")
 
     def __init__(self):
@@ -37,6 +38,7 @@ class DiscordAlertBot:
 
         auth_payload = {"client_id": self.__client_id, "client_secret": self.__client_secret,
                         "grant_type": "client_credentials"}
+
         auth_request = requests.post(url=self.twitch_auth, json=auth_payload)
         auth_request.raise_for_status()
 
@@ -71,7 +73,7 @@ class DiscordAlertBot:
         game_img = game_img.replace("/./", "/")
 
         twitch = {'live': channel_details.get("is_live"),
-                  'name': channel_details.get('display_name'),
+                  'name': channel_details.get('broadcaster_name'),
                   'title': channel_details.get('title'),
                   'begin': time_conversion(channel_details.get('started_at')),
                   'game': game_details.get('name'),

@@ -32,7 +32,7 @@ def time_conversion(iso_timestamp: str) -> str:
 
         return formatted_time
 
-    return "Not Live"
+    return datetime.strftime(datetime.now(), "%b %d %Y %I:%M%p")
 
 
 def alert_msg(data: dict) -> dict:
