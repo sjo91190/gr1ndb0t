@@ -6,6 +6,21 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+def greet_data():
+    greet_users = ['ultimatesebs', 'shumamofo', 'critterjason', 'youreonthephone', 'samgrind']
+    greet_status = {k: False for k in greet_users}
+
+    greet_msg = {'ultimatesebs': 'Sup sebs',
+                 'shumamofo': 'Everyone be on your best behavior, Shuma is here!!',
+                 'youreonthephone': '@youreonthephone So ur with ur honey and yur making out wen the phone rigns. U anser it n the vioce is "wut r u doing wit my daughter?" U tell ur girl n she say "my dad is ded". THEN WHO WAS PHONE?',
+                 'critterjason': '@critterjason jesus christ you scared the shit outta me',
+                 'samgrind': 'KEKW streamer writing in his own chat'}
+
+    greeter = {"status": greet_status, "msg": greet_msg}
+
+    return greeter
+
+
 def get_env() -> None:
     """This function reads in your .env file and sets the environment variables
 
@@ -68,3 +83,4 @@ class CreateLogger:
         self.logger.addHandler(file_handler)
 
         return self.logger
+

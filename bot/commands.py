@@ -1,3 +1,4 @@
+import time
 import os
 
 
@@ -42,13 +43,19 @@ class BotCommands:
 
             return True
 
-    def greet(self, target: str, username: str) -> bool:
-        if username == target:
-            self.logger.info(f"GREETING SENT - {username}")
-            self.logger.info("\n\n******************\nGREETING SENT\n*****************\n\n")
-            self.sock.send(f"{self.prefix}sup, {username}\r\n".encode('utf-8'))
+    def greet(self, sender, greet_data):
+        if sender in greet_data['status'].keys():
+            if not greet_data['status'][sender]:
+                self.sock.send(f"{self.prefix}{greet_data['msg'][sender]}\r\n".encode('utf-8'))
+                greet_data['status'][sender] = True
 
-            return True
+        return greet_data
+
+    def raid_msg(self, raider: str, raid_party: str):
+        self.logger.info(f"RAID RECEIVED - {raider} - {raid_party}")
+        self.sock.send(f"{self.prefix}samgri2Raid samgri2Raid Everyone be cool, stay calm, and pretend that you like samgrind because {raid_party}!!! samgri2Raid samgri2Raid\r\n".encode('utf-8'))
+        time.sleep(1)
+        self.sock.send(f"{self.prefix}We appreciate the raid, {raider} <3 Everyone go and smash that follow button at https://twitch.tv/{raider}\r\n".encode('utf-8'))
 
 
 class ChannelRewards(BotCommands):

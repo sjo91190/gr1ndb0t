@@ -4,13 +4,13 @@ import os
 import sys
 import socket
 import requests
-from config import get_env, CreateLogger
+from config import get_env, CreateLogger, greet_data
 from utils import time_conversion, alert_msg, initiate_connection
 from bot.commands import AllCommands
 
 
 get_env()
-SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "NOTICE", "RECONNECT", "ROOMSTATE", "USERNOTICE", "USERSTATE"]
+SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "NOTICE", "RECONNECT", "ROOMSTATE", "USERSTATE"]
 
 
 class DiscordAlertBot:
@@ -97,7 +97,7 @@ class TwitchChatBot:
     def __init__(self, channel, nickname):
         self.logger = CreateLogger().file_console_stream()
         self.channel = channel
-        self.greeted = False
+        self.greet_user = greet_data()
 
         self.server = os.getenv("IRC_SERVER")
         self.port = int(os.getenv("IRC_PORT"))
@@ -146,6 +146,13 @@ class TwitchChatBot:
                         parter = parter.group(1)
                         self.logger.info(f"CHANNEL PART - {parter}")
 
+                elif "USERNOTICE" in msg:
+                    possible_raid_data = re.search(".*;display-name=(.*?);.*;msg-id=(.*?);.*;system-msg=(.*?);", msg)
+                    if possible_raid_data.group(2) == "raid":
+                        raider = possible_raid_data.group(1)
+                        raid_party = possible_raid_data.group(3).replace("\\s", " ")
+                        self.cmds.raid_msg(raider=raider, raid_party=raid_party)
+
                 elif full_message:
                     username = full_message.group(1).strip()
                     msg_id = full_message.group(2).strip()
@@ -155,14 +162,11 @@ class TwitchChatBot:
 
                     self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
 
-                    if not self.greeted:
-                        self.cmds.greet(target="ultimatesebs", username=username.lower())
-                        self.greeted = True
-
                     channel_point_reward = self.cmds.get_reward(reward_uuid=reward_id)
                     if channel_point_reward:
                         channel_point_reward(msg=message, sender=username)
 
+                    self.greet_user = self.cmds.greet(sender=username, greet_data=self.greet_user)
                     self.cmds.lurker(msg=message, sender=username)
                     self.cmds.switch_code(msg=message, sender=username)
                     self.cmds.updog(msg=message, sender=username)
