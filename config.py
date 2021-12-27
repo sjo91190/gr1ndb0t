@@ -7,14 +7,15 @@ from dotenv import load_dotenv
 
 
 def greet_data():
-    greet_users = ['ultimatesebs', 'shumamofo', 'critterjason', 'youreonthephone', 'samgrind']
+    greet_users = ['ultimatesebs', 'shumamofo', 'critterjason', 'youreonthephone', 'samgrind', 'misteryogapants']
     greet_status = {k: False for k in greet_users}
 
-    greet_msg = {'ultimatesebs': 'Sup sebs',
+    greet_msg = {'ultimatesebs': 'Sup sebs, you gonna mod today or am I going to do all the work?',
                  'shumamofo': 'Everyone be on your best behavior, Shuma is here!!',
                  'youreonthephone': '@youreonthephone So ur with ur honey and yur making out wen the phone rigns. U anser it n the vioce is "wut r u doing wit my daughter?" U tell ur girl n she say "my dad is ded". THEN WHO WAS PHONE?',
                  'critterjason': '@critterjason jesus christ you scared the shit outta me',
-                 'samgrind': 'KEKW streamer writing in his own chat'}
+                 'samgrind': 'KEKW streamer writing in his own chat KEKL',
+                 'misteryogapants': '@misteryogapants is here? what an INSANE announcement <3'}
 
     greeter = {"status": greet_status, "msg": greet_msg}
 
