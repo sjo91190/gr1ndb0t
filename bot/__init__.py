@@ -167,6 +167,7 @@ class TwitchChatBot:
                         channel_point_reward(msg=message, sender=username)
 
                     self.greet_user = self.cmds.greet(sender=username, greet_data=self.greet_user)
+                    self.cmds.nightbot(sender=username)
                     self.cmds.lurker(msg=message, sender=username)
                     self.cmds.switch_code(msg=message, sender=username)
                     self.cmds.updog(msg=message, sender=username)
