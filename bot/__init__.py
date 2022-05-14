@@ -109,7 +109,7 @@ class TwitchChatBot:
 
         self.sock = socket.socket()
         self.sock.connect((self.server, self.port))
-        self.sock.settimeout(1)
+        self.sock.settimeout(2)
 
         initiate_connection(sock=self.sock, token=self.__token, nickname=nickname, channel=self.channel)
 
@@ -125,7 +125,7 @@ class TwitchChatBot:
         #     }
         # }
         #
-        # self.pubsub = create_connection("wss://pubsub-edge.twitch.tv", timeout=1)
+        # self.pubsub = create_connection("wss://pubsub-edge.twitch.tv", timeout=2)
         # self.pubsub.send(json.dumps(message))
 
     def send_pong(self) -> bool:

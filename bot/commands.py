@@ -38,7 +38,7 @@ class BotCommands:
             return True
 
     def updog(self, msg: str, sender: str) -> bool:
-        if "updog" in msg or "up dog" in msg:
+        if "updog" in msg.lower() or "up dog" in msg.lower():
             self.logger.info(f"COMMAND RECEIVED - updog lul - Sender: {sender}")
             self.sock.send(f"{self.prefix}not much, u? {sender}\r\n".encode("utf-8"))
 
