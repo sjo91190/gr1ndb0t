@@ -46,9 +46,9 @@ class BotCommands:
 
     def greet(self, sender, greet_data):
         if sender.lower() in greet_data['status'].keys():
-            if not greet_data['status'][sender]:
-                self.sock.send(f"{self.prefix}{greet_data['msg'][sender]}\r\n".encode('utf-8'))
-                greet_data['status'][sender] = True
+            if not greet_data['status'][sender.lower()]:
+                self.sock.send(f"{self.prefix}{greet_data['msg'][sender.lower()]}\r\n".encode('utf-8'))
+                greet_data['status'][sender.lower()] = True
 
         return greet_data
 
@@ -70,19 +70,28 @@ class BotCommands:
 class ChannelRewards(BotCommands):
 
     def get_reward(self, reward_uuid: str):
-        # print(f"REWARD ID: {reward_uuid}")
+        print(f"REWARD ID from commands: {reward_uuid}")
         reward_dict = {
-            os.getenv("OUIJA_PHRASE"): self.ouija_phrase
+            os.getenv("OUIJA_PHRASE"): self.ouija_phrase,
+            os.getenv("HYDRATE"): self.hydrate
         }
 
         if reward_dict.get(reward_uuid) is not None:
             return reward_dict.get(reward_uuid)
+        else:
+            self.sock.send(f"{self.prefix}Unknown Reward UUID\r\n".encode("utf-8"))
 
         return None
 
     def ouija_phrase(self, msg: str, sender: str) -> bool:
         self.logger.info(f"REDEMPTION RECEIVED - Ouija Phrase - Sender: {sender} - Phrase: {msg}")
-        self.sock.send(f"{self.prefix}{self.channel} Phrase submission received! -- {msg}\r\n".encode("utf-8"))
+        self.sock.send(f"{self.prefix}Phrase submission received! -- {msg}\r\n".encode("utf-8"))
+
+        return True
+
+    def hydrate(self) -> bool:
+        self.logger.info(f"REDEMPTION RECEIVED - Hydrate")
+        self.sock.send(f"{self.prefix}Hydrate Received!!!\r\n".encode("utf-8"))
 
         return True
 

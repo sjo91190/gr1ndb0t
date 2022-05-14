@@ -4,13 +4,17 @@ import os
 import sys
 import socket
 import requests
+import uuid
+import json
+import websocket
+from websocket import create_connection
 from config import get_env, CreateLogger, greet_data
 from utils import time_conversion, alert_msg, initiate_connection
 from bot.commands import AllCommands
 
 
 get_env()
-SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "NOTICE", "RECONNECT", "ROOMSTATE", "USERSTATE"]
+SERVER_CMDS = ["CLEARCHAT", "CLEARMSG", "HOSTTARGET", "RECONNECT", "ROOMSTATE", "USERSTATE"]
 
 
 class DiscordAlertBot:
@@ -105,10 +109,24 @@ class TwitchChatBot:
 
         self.sock = socket.socket()
         self.sock.connect((self.server, self.port))
+        self.sock.settimeout(1)
 
         initiate_connection(sock=self.sock, token=self.__token, nickname=nickname, channel=self.channel)
 
         self.cmds = AllCommands(logger=self.logger, sock=self.sock, channel=self.channel)
+
+        # nonce = uuid.uuid1().hex
+        # message = {
+        #     "type": "LISTEN",
+        #     "nonce": nonce,
+        #     "data": {
+        #         "topics": ["channel-points-channel-v1." + os.getenv("USER_ID")],
+        #         "auth_token": os.getenv("ACCESS_TOKEN")
+        #     }
+        # }
+        #
+        # self.pubsub = create_connection("wss://pubsub-edge.twitch.tv", timeout=1)
+        # self.pubsub.send(json.dumps(message))
 
     def send_pong(self) -> bool:
         self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
@@ -120,12 +138,24 @@ class TwitchChatBot:
         while True:
             try:
                 msg = self.sock.recv(2048).decode("utf-8")
+            except socket.timeout as time_error:
+                t_err = time_error.args[0]
+                if t_err == "timed out":
+                    pass
+                else:
+                    print(time_error)
+                    sys.exit(1)
 
+            except socket.error as time_error:
+                print(time_error)
+                sys.exit(1)
+
+            except KeyboardInterrupt:
+                self.sock.close()
+                sys.exit(0)
+
+            else:
                 full_message = re.search(".*;display-name=(.*?);.*;id=(.*?);.*mod=(.*?);.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
-                reward_id = re.search(";custom-reward-id=(.*?);", msg)
-
-                if reward_id:
-                    reward_id = reward_id.group(1)
 
                 if any(cmd in msg for cmd in SERVER_CMDS):
                     self.logger.info(f"SERVER COMMAND - {msg.strip()}")
@@ -146,7 +176,7 @@ class TwitchChatBot:
                         parter = parter.group(1)
                         self.logger.info(f"CHANNEL PART - {parter}")
 
-                elif "USERNOTICE" in msg:
+                elif "USERNOTICE" in msg or "NOTICE" in msg:
                     possible_raid_data = re.search(".*;display-name=(.*?);.*;msg-id=(.*?);.*;system-msg=(.*?);", msg)
                     if possible_raid_data.group(2) == "raid":
                         raider = possible_raid_data.group(1)
@@ -162,10 +192,6 @@ class TwitchChatBot:
 
                     self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
 
-                    channel_point_reward = self.cmds.get_reward(reward_uuid=reward_id)
-                    if channel_point_reward:
-                        channel_point_reward(msg=message, sender=username)
-
                     self.greet_user = self.cmds.greet(sender=username, greet_data=self.greet_user)
                     self.cmds.nightbot(sender=username)
                     self.cmds.lurker(msg=message, sender=username)
@@ -175,6 +201,29 @@ class TwitchChatBot:
                 else:
                     self.logger.info(f"UNCATEGORIZED - {msg.strip()}")
 
-            except KeyboardInterrupt:
-                self.sock.close()
-                sys.exit(0)
+            # try:
+            #     pubmsg = self.pubsub.recv()
+            #
+            # except websocket._exceptions.WebSocketTimeoutException as error:
+            #     err = error.args[0]
+            #     if err == 'The read operation timed out':
+            #         pass
+            #     else:
+            #         sys.exit(1)
+            #
+            # except KeyboardInterrupt:
+            #     self.sock.close()
+            #     self.pubsub.close()
+            #     sys.exit(0)
+            #
+            # else:
+            #     pub_message = json.loads(pubmsg)
+            #     try:
+            #         reward_id = json.loads(pub_message.get('data').get('message')).get('data').get('redemption').get('reward').get('id')
+            #
+            #         send_it = self.cmds.get_reward(reward_id)
+            #         if send_it:
+            #             send_it()
+            #
+            #     except AttributeError:
+            #         continue

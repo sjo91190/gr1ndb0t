@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 
 def greet_data():
-    greet_users = ['ultimatesebs', 'shumamofo', 'critterjason', 'youreonthephone', 'samgrind', 'misteryogapants', 'annwyl_the_spicy']
+    greet_users = ['ultimatesebs', 'shumamofo', 'critterjason', 'youreonthephone', 'samgrind', 'misteryogapants', 'annwyl_the_spicy', 'naribynature', 'danmangg45', 'peach_tea_em']
     greet_status = {k: False for k in greet_users}
 
     greet_msg = {'ultimatesebs': 'Sup sebs, you gonna mod today or am I going to do all the work?',
@@ -16,7 +16,10 @@ def greet_data():
                  'critterjason': '@critterjason jesus christ you scared the shit outta me',
                  'samgrind': 'KEKW streamer writing in his own chat KEKL',
                  'misteryogapants': '@misteryogapants is here? what an INSANE announcement <3',
-                 'annwyl_the_spicy': 'gr1ndb0t_the_spicy'}
+                 'annwyl_the_spicy': 'gr1ndb0t_the_spicy',
+                 'naribynature': 'All rejoice! Nari of Nature has arrived. What a momentous occasion, one truly for the books!',
+                 'danmangg45': 'Here at Samgrind Industries, we believe adequate hydration is very important, which is why we are very grateful for our good pal @danmangg45 for reminding us. How about this, when you see the hydrate in chat, take a sip with me!',
+                 'peach_tea_em': '!peach brought the CAKE!!'}
 
     greeter = {"status": greet_status, "msg": greet_msg}
 
