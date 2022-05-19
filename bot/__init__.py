@@ -2,6 +2,7 @@
 import re
 import os
 import sys
+import time
 import socket
 import requests
 import uuid
@@ -109,24 +110,24 @@ class TwitchChatBot:
 
         self.sock = socket.socket()
         self.sock.connect((self.server, self.port))
-        self.sock.settimeout(2)
+        self.sock.settimeout(1)
 
         initiate_connection(sock=self.sock, token=self.__token, nickname=nickname, channel=self.channel)
 
         self.cmds = AllCommands(logger=self.logger, sock=self.sock, channel=self.channel)
 
-        # nonce = uuid.uuid1().hex
-        # message = {
-        #     "type": "LISTEN",
-        #     "nonce": nonce,
-        #     "data": {
-        #         "topics": ["channel-points-channel-v1." + os.getenv("USER_ID")],
-        #         "auth_token": os.getenv("ACCESS_TOKEN")
-        #     }
-        # }
-        #
-        # self.pubsub = create_connection("wss://pubsub-edge.twitch.tv", timeout=2)
-        # self.pubsub.send(json.dumps(message))
+        nonce = uuid.uuid1().hex
+        message = {
+            "type": "LISTEN",
+            "nonce": nonce,
+            "data": {
+                "topics": ["channel-points-channel-v1." + os.getenv("USER_ID")],
+                "auth_token": os.getenv("ACCESS_TOKEN")
+            }
+        }
+
+        self.pubsub = create_connection("wss://pubsub-edge.twitch.tv", timeout=1)
+        self.pubsub.send(json.dumps(message))
 
     def send_pong(self) -> bool:
         self.sock.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
@@ -135,95 +136,109 @@ class TwitchChatBot:
         return True
 
     def run(self):
+        ping_start = int(time.time())
+        ping_send = ping_start + 120
         while True:
-            try:
-                msg = self.sock.recv(2048).decode("utf-8")
-            except socket.timeout as time_error:
-                t_err = time_error.args[0]
-                if t_err == "timed out":
-                    pass
-                else:
+            if ping_start <= ping_send:
+                ping_start = int(time.time())
+                try:
+                    msg = self.sock.recv(2048).decode("utf-8")
+                except socket.timeout as time_error:
+                    t_err = time_error.args[0]
+                    if t_err == "timed out":
+                        pass
+                    else:
+                        print(time_error)
+                        sys.exit(1)
+
+                except socket.error as time_error:
                     print(time_error)
                     sys.exit(1)
 
-            except socket.error as time_error:
-                print(time_error)
-                sys.exit(1)
-
-            except KeyboardInterrupt:
-                self.sock.close()
-                sys.exit(0)
-
-            else:
-                full_message = re.search(".*;display-name=(.*?);.*;id=(.*?);.*mod=(.*?);.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
-
-                if any(cmd in msg for cmd in SERVER_CMDS):
-                    self.logger.info(f"SERVER COMMAND - {msg.strip()}")
-
-                elif msg.startswith("PING"):
-                    self.logger.info(f"SERVER MSG - {msg.strip()}")
-                    self.send_pong()
-
-                elif "JOIN" in msg:
-                    joiner = re.search(":(.*?)!", msg)
-                    if joiner:
-                        joiner = joiner.group(1)
-                        self.logger.info(f"CHANNEL JOIN - {joiner}")
-
-                elif "PART" in msg:
-                    parter = re.search(":(.*?)!", msg)
-                    if parter:
-                        parter = parter.group(1)
-                        self.logger.info(f"CHANNEL PART - {parter}")
-
-                elif "USERNOTICE" in msg or "NOTICE" in msg:
-                    possible_raid_data = re.search(".*;display-name=(.*?);.*;msg-id=(.*?);.*;system-msg=(.*?);", msg)
-                    if possible_raid_data.group(2) == "raid":
-                        raider = possible_raid_data.group(1)
-                        raid_party = possible_raid_data.group(3).replace("\\s", " ")
-                        self.cmds.raid_msg(raider=raider, raid_party=raid_party)
-
-                elif full_message:
-                    username = full_message.group(1).strip()
-                    msg_id = full_message.group(2).strip()
-                    mod_status = full_message.group(3).strip()
-                    channel = full_message.group(4).strip()
-                    message = full_message.group(5).strip()
-
-                    self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
-
-                    self.greet_user = self.cmds.greet(sender=username, greet_data=self.greet_user)
-                    self.cmds.nightbot(sender=username)
-                    self.cmds.lurker(msg=message, sender=username)
-                    self.cmds.switch_code(msg=message, sender=username)
-                    self.cmds.updog(msg=message, sender=username)
+                except KeyboardInterrupt:
+                    self.sock.close()
+                    sys.exit(0)
 
                 else:
-                    self.logger.info(f"UNCATEGORIZED - {msg.strip()}")
+                    full_message = re.search(".*;display-name=(.*?);.*;id=(.*?);.*mod=(.*?);.*.tmi.twitch.tv PRIVMSG #(.*) :(.*)", msg)
 
-            # try:
-            #     pubmsg = self.pubsub.recv()
-            #
-            # except websocket._exceptions.WebSocketTimeoutException as error:
-            #     err = error.args[0]
-            #     if err == 'The read operation timed out':
-            #         pass
-            #     else:
-            #         sys.exit(1)
-            #
-            # except KeyboardInterrupt:
-            #     self.sock.close()
-            #     self.pubsub.close()
-            #     sys.exit(0)
-            #
-            # else:
-            #     pub_message = json.loads(pubmsg)
-            #     try:
-            #         reward_id = json.loads(pub_message.get('data').get('message')).get('data').get('redemption').get('reward').get('id')
-            #
-            #         send_it = self.cmds.get_reward(reward_id)
-            #         if send_it:
-            #             send_it()
-            #
-            #     except AttributeError:
-            #         continue
+                    if any(cmd in msg for cmd in SERVER_CMDS):
+                        self.logger.info(f"SERVER COMMAND - {msg.strip()}")
+
+                    elif msg.startswith("PING"):
+                        self.logger.info(f"SERVER MSG - {msg.strip()}")
+                        self.send_pong()
+
+                    elif "JOIN" in msg:
+                        joiner = re.search(":(.*?)!", msg)
+                        if joiner:
+                            joiner = joiner.group(1)
+                            self.logger.info(f"CHANNEL JOIN - {joiner}")
+
+                    elif "PART" in msg:
+                        parter = re.search(":(.*?)!", msg)
+                        if parter:
+                            parter = parter.group(1)
+                            self.logger.info(f"CHANNEL PART - {parter}")
+
+                    elif "USERNOTICE" in msg or "NOTICE" in msg:
+                        possible_raid_data = re.search(".*;display-name=(.*?);.*;msg-id=(.*?);.*;system-msg=(.*?);", msg)
+                        if possible_raid_data.group(2) == "raid":
+                            raider = possible_raid_data.group(1)
+                            raid_party = possible_raid_data.group(3).replace("\\s", " ")
+                            self.cmds.raid_msg(raider=raider, raid_party=raid_party)
+
+                    elif full_message:
+                        username = full_message.group(1).strip()
+                        msg_id = full_message.group(2).strip()
+                        mod_status = full_message.group(3).strip()
+                        channel = full_message.group(4).strip()
+                        message = full_message.group(5).strip()
+
+                        self.logger.info(f"USER MSG - Channel: {channel} | Mod Status: {mod_status} | Username: {username} | Message: {message}")
+
+                        self.greet_user = self.cmds.greet(sender=username, greet_data=self.greet_user)
+                        self.cmds.nightbot(sender=username)
+                        self.cmds.lurker(msg=message, sender=username)
+                        self.cmds.switch_code(msg=message, sender=username)
+                        self.cmds.updog(msg=message, sender=username)
+
+                    else:
+                        self.logger.info(f"UNCATEGORIZED - {msg.strip()}")
+
+                try:
+                    pubmsg = self.pubsub.recv()
+
+                except websocket._exceptions.WebSocketTimeoutException as error:
+                    err = error.args[0]
+                    if err == 'The read operation timed out':
+                        pass
+                    else:
+                        sys.exit(1)
+
+                except KeyboardInterrupt:
+                    self.sock.close()
+                    self.pubsub.close()
+                    sys.exit(0)
+
+                else:
+                    pub_message = json.loads(pubmsg)
+                    if pub_message.get("type") == "PONG":
+                        self.logger.info("PUB SUB PONG RECEIVED")
+                        continue
+
+                    try:
+                        reward_id = json.loads(pub_message.get('data').get('message')).get('data').get('redemption').get('reward').get('id')
+
+                        send_it = self.cmds.get_reward(reward_id)
+                        if send_it:
+                            send_it()
+
+                    except AttributeError:
+                        continue
+
+            else:
+                self.pubsub.send(json.dumps({"type": "PING"}))
+                self.logger.info("PUB SUB PING SENT")
+                ping_start = int(time.time())
+                ping_send = ping_start + 120
